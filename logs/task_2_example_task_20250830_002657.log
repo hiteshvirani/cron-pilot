@@ -1,0 +1,4 @@
+2025-08-30 00:26:57,821 - task_2_20250830_002657 - INFO - Starting task execution: example_task
+2025-08-30 00:26:57,822 - task_2_20250830_002657 - INFO - Task module loaded successfully: example_task
+2025-08-30 00:26:59,824 - task_2_20250830_002657 - INFO - Task completed successfully in 2.00 seconds
+2025-08-30 00:26:59,825 - task_2_20250830_002657 - INFO - Task result: {'status': 'success', 'message': 'Example task completed successfully', 'processed_items': 42, 'timestamp': '2025-08-30T00:26:59.824474', 'config_used': {'send_email': False, 'email_recipients': [], 'delay_seconds': 2, 'message': 'Hello from example task!'}}

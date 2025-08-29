@@ -1,0 +1,31 @@
+admin:
+  username: "admin"
+  password: "admin123"  # Change this to a secure password
+
+server:
+  host: "0.0.0.0"
+  port: 7000
+
+database:
+  url: "sqlite:///./cronpilot.db"
+
+scheduler:
+  timezone: "UTC"
+  max_workers: 10
+
+email:
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  username: ""
+  password: ""
+  from_email: ""
+  use_tls: true
+
+logging:
+  retention_days: 7
+  log_dir: "./logs"
+  max_log_size_mb: 10
+
+tasks:
+  directory: "./tasks"
+  auto_discover: true 

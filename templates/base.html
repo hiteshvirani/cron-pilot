@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CronPilot{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin: 0.25rem 0;
+        }
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border-radius: 0.75rem;
+        }
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid #e9ecef;
+            border-radius: 0.75rem 0.75rem 0 0 !important;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .table th {
+            border-top: none;
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <h4 class="text-white">
+                            <i class="fas fa-rocket me-2"></i>
+                            CronPilot
+                        </h4>
+                        <small class="text-white-50">Task Management System</small>
+                    </div>
+                    
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/admin' %}active{% endif %}" href="/admin">
+                                <i class="fas fa-tachometer-alt me-2"></i>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/admin/tasks' %}active{% endif %}" href="/admin/tasks">
+                                <i class="fas fa-tasks me-2"></i>
+                                Tasks
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/admin/logs' %}active{% endif %}" href="/admin/logs">
+                                <i class="fas fa-file-alt me-2"></i>
+                                Logs
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/admin/email' %}active{% endif %}" href="/admin/email">
+                                <i class="fas fa-envelope me-2"></i>
+                                Email
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/admin/settings' %}active{% endif %}" href="/admin/settings">
+                                <i class="fas fa-cog me-2"></i>
+                                Settings
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <hr class="text-white-50">
+                    
+                    <div class="text-center">
+                        <small class="text-white-50">
+                            Logged in as: {{ admin_user }}
+                        </small>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <!-- Top navbar -->
+                <nav class="navbar navbar-expand-lg navbar-light bg-white mb-4">
+                    <div class="container-fluid">
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".sidebar">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        
+                        <div class="navbar-nav ms-auto">
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-user-circle me-1"></i>
+                                    {{ admin_user }}
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="/admin/settings">Settings</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="/docs">API Docs</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+
+                <!-- Page content -->
+                <div class="container-fluid">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <script>
+        // Auto-refresh dashboard stats
+        function refreshStats() {
+            fetch('/api/admin/stats')
+                .then(response => response.json())
+                .then(data => {
+                    // Update dashboard stats if on dashboard page
+                    if (window.location.pathname === '/admin') {
+                        updateDashboardStats(data);
+                    }
+                })
+                .catch(error => console.error('Error refreshing stats:', error));
+        }
+        
+        // Refresh stats every 30 seconds
+        setInterval(refreshStats, 30000);
+        
+        // Show loading spinner for form submissions
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function() {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                        submitBtn.disabled = true;
+                    }
+                });
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

@@ -1,0 +1,4 @@
+2025-08-30 00:40:22,364 - task_3_20250830_004022 - INFO - Starting task execution: simple_2min_task
+2025-08-30 00:40:22,365 - task_3_20250830_004022 - INFO - Task module loaded successfully: simple_2min_task
+2025-08-30 00:42:22,377 - task_3_20250830_004022 - INFO - Task completed successfully in 120.01 seconds
+2025-08-30 00:42:22,378 - task_3_20250830_004022 - INFO - Task result: {'status': 'success', 'message': 'Simple 2-minute task completed successfully', 'expected_duration_minutes': 2, 'actual_duration_seconds': 120.01110243797302, 'progress_updates': 12, 'start_time': '2025-08-30T00:40:22.366008', 'end_time': '2025-08-30T00:42:22.377227', 'main_message': 'Hello from simple 2-minute task!'}

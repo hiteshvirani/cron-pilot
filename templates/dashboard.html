@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - CronPilot{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-tachometer-alt me-2"></i>
+        Dashboard
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshStats()">
+                <i class="fas fa-sync-alt me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Tasks
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-tasks">
+                            {{ stats.total_tasks }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tasks fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Active Tasks
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="active-tasks">
+                            {{ stats.active_tasks }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-play-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Total Runs
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-runs">
+                            {{ stats.total_runs }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-history fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Log Files
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-logs">
+                            {{ stats.total_logs }}
+                        </div>
+                        <div class="text-xs text-gray-600">
+                            {{ "%.2f"|format(stats.total_log_size_mb) }} MB
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-file-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity and Quick Actions -->
+<div class="row">
+    <!-- Recent Activity -->
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-clock me-2"></i>Recent Activity
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if recent_runs %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Task</th>
+                                <th>Status</th>
+                                <th>Started</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for run in recent_runs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ run.task.name if run.task else 'Unknown' }}</strong>
+                                </td>
+                                <td>
+                                    {% if run.status == 'success' %}
+                                        <span class="badge bg-success status-badge">
+                                            <i class="fas fa-check me-1"></i>Success
+                                        </span>
+                                    {% elif run.status == 'failed' %}
+                                        <span class="badge bg-danger status-badge">
+                                            <i class="fas fa-times me-1"></i>Failed
+                                        </span>
+                                    {% elif run.status == 'running' %}
+                                        <span class="badge bg-primary status-badge">
+                                            <i class="fas fa-spinner fa-spin me-1"></i>Running
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary status-badge">
+                                            {{ run.status }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if run.started_at %}
+                                        {{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if run.duration_seconds %}
+                                        {{ "%.2f"|format(run.duration_seconds) }}s
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-3x mb-3"></i>
+                    <p>No recent activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/admin/tasks" class="btn btn-primary">
+                        <i class="fas fa-tasks me-2"></i>Manage Tasks
+                    </a>
+                    <a href="/api/tasks/discover" class="btn btn-outline-primary">
+                        <i class="fas fa-search me-2"></i>Discover New Tasks
+                    </a>
+                    <a href="/admin/logs" class="btn btn-outline-info">
+                        <i class="fas fa-file-alt me-2"></i>View Logs
+                    </a>
+                    <a href="/admin/email" class="btn btn-outline-warning">
+                        <i class="fas fa-envelope me-2"></i>Email Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-server me-2"></i>System Status
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-8">Email System</div>
+                    <div class="col-4 text-end">
+                        {% if stats.email_configured %}
+                            <span class="badge bg-success">Configured</span>
+                        {% else %}
+                            <span class="badge bg-warning">Not Configured</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-8">Database</div>
+                    <div class="col-4 text-end">
+                        <span class="badge bg-success">Connected</span>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-8">Scheduler</div>
+                    <div class="col-4 text-end">
+                        <span class="badge bg-success">Running</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateDashboardStats(data) {
+    // Update statistics cards
+    document.getElementById('total-tasks').textContent = data.tasks.total;
+    document.getElementById('active-tasks').textContent = data.tasks.active;
+    document.getElementById('total-runs').textContent = data.runs.total;
+    document.getElementById('total-logs').textContent = data.logs.total_files;
+}
+</script>
+{% endblock %} 
