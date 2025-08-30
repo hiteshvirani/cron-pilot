@@ -31,6 +31,10 @@ class Task(Base):
     schedule_type = Column(String(50), nullable=False, default=ScheduleType.MANUAL.value)
     schedule_config = Column(Text, nullable=True)  # JSON string for cron expression or schedule details
     is_active = Column(Boolean, default=True)
+    # New fields for environment management
+    environment_path = Column(String(500), nullable=True)  # Path to virtual environment
+    requirements_path = Column(String(500), nullable=True)  # Path to requirements.txt
+    python_executable = Column(String(500), nullable=True)  # Python executable path
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

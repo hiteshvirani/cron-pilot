@@ -7,6 +7,7 @@ from app.models.models import Task, TaskRun, ScheduleType, TaskStatus
 from app.task_executor import task_executor
 from app.scheduler import task_scheduler
 from app.log_manager import log_manager
+from app.environment_manager import environment_manager
 import json
 from datetime import datetime
 
@@ -94,6 +95,78 @@ def discover_tasks(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error discovering tasks: {str(e)}"
+        )
+
+@router.get("/environments")
+def get_environments(
+    current_admin: str = Depends(get_current_admin)
+):
+    """Get all discovered environments"""
+    try:
+        environments = environment_manager.discover_environments()
+        return {"environments": environments}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error discovering environments: {str(e)}"
+        )
+
+@router.get("/requirements")
+def get_requirements_files(
+    current_admin: str = Depends(get_current_admin)
+):
+    """Get all discovered requirements files"""
+    try:
+        requirements_files = environment_manager.discover_requirements_files()
+        return {"requirements_files": requirements_files}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error discovering requirements files: {str(e)}"
+        )
+
+@router.get("/projects")
+def get_task_projects(
+    current_admin: str = Depends(get_current_admin)
+):
+    """Get all discovered task projects"""
+    try:
+        task_projects = environment_manager.discover_task_projects()
+        return {"task_projects": task_projects}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error discovering task projects: {str(e)}"
+        )
+
+@router.post("/validate-environment")
+def validate_environment(
+    env_data: Dict[str, Any],
+    current_admin: str = Depends(get_current_admin)
+):
+    """Validate an environment and requirements"""
+    try:
+        env_path = env_data.get("environment_path")
+        requirements_path = env_data.get("requirements_path")
+        
+        if not env_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Environment path is required"
+            )
+        
+        validation_result = environment_manager.validate_environment(env_path, requirements_path)
+        return validation_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error validating environment: {str(e)}"
         )
 
 @router.post("/register")
@@ -201,7 +274,7 @@ def update_task_schedule(
     current_admin: str = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
-    """Update task schedule"""
+    """Update task schedule and environment configuration"""
     try:
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
@@ -214,6 +287,24 @@ def update_task_schedule(
         task.schedule_type = schedule_data.get('schedule_type', task.schedule_type)
         task.schedule_config = json.dumps(schedule_data.get('schedule_config', {})) if schedule_data.get('schedule_config') else None
         task.is_active = schedule_data.get('is_active', task.is_active)
+        
+        # Update environment configuration
+        task.environment_path = schedule_data.get('environment_path', task.environment_path)
+        task.requirements_path = schedule_data.get('requirements_path', task.requirements_path)
+        
+        # Update python executable if environment is specified
+        if task.environment_path:
+            validation = environment_manager.validate_environment(task.environment_path, task.requirements_path)
+            if validation["valid"]:
+                task.python_executable = validation["python_executable"]
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Environment validation failed: {validation['errors']}"
+                )
+        else:
+            task.python_executable = None
+        
         task.updated_at = datetime.utcnow()
         
         db.commit()
@@ -224,14 +315,14 @@ def update_task_schedule(
         else:
             task_scheduler.add_task_to_scheduler(task)
         
-        return {"message": "Task schedule updated successfully"}
+        return {"message": "Task configuration updated successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating task schedule: {str(e)}"
+            detail=f"Error updating task configuration: {str(e)}"
         )
 
 @router.get("/{task_id}/runs")

@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Main CronPilot application
+  cronpilot:
+    build: .
+    container_name: cronpilot-app
+    ports:
+      - "7000:7000"  # Keep main app port
+    environment:
+      - PYTHONPATH=/app
+      - TZ=UTC
+    volumes:
+      # Mount tasks directory for easy task management
+      - ./tasks:/app/tasks
+      # Mount logs directory for persistent logging
+      - ./logs:/app/logs
+      # Mount config for easy configuration changes
+      - ./config.yaml:/app/config.yaml:ro
+      # Mount database for persistence
+      - cronpilot_data:/app
+    restart: unless-stopped
+    networks:
+      - cronpilot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL database (using different port)
+  postgres:
+    image: postgres:15-alpine
+    container_name: cronpilot-postgres
+    environment:
+      POSTGRES_DB: cronpilot
+      POSTGRES_USER: cronpilot
+      POSTGRES_PASSWORD: cronpilot_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Use port 5433 instead of 5432
+    restart: unless-stopped
+    networks:
+      - cronpilot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cronpilot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching (using different port)
+  redis:
+    image: redis:7-alpine
+    container_name: cronpilot-redis
+    ports:
+      - "6380:6379"  # Use port 6380 instead of 6379
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - cronpilot-network
+    command: redis-server --appendonly yes
+
+volumes:
+  cronpilot_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  cronpilot-network:
+    driver: bridge

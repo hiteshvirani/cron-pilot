@@ -2,12 +2,14 @@ import importlib.util
 import sys
 import os
 import traceback
+import subprocess
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable
 from sqlalchemy.orm import Session
 from app.models.models import Task, TaskRun, TaskStatus
 from app.log_manager import log_manager
 from app.email_service import email_service
+from app.environment_manager import environment_manager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -63,20 +65,51 @@ class TaskExecutor:
         try:
             task_logger.info(f"Starting task execution: {task.name}")
             
-            # Load task module
-            run_function = self.load_task_module(task)
-            if not run_function:
-                raise Exception(f"Could not load task module: {task.module_name}")
+            # Handle environment setup if specified
+            python_executable = None
+            if task.environment_path:
+                task_logger.info(f"Setting up environment: {task.environment_path}")
+                
+                # Validate environment
+                env_validation = environment_manager.validate_environment(
+                    task.environment_path, 
+                    task.requirements_path
+                )
+                
+                if not env_validation["valid"]:
+                    raise Exception(f"Environment validation failed: {env_validation['errors']}")
+                
+                python_executable = env_validation["python_executable"]
+                task_logger.info(f"Using Python executable: {python_executable}")
+                
+                # Install requirements if specified
+                if task.requirements_path:
+                    task_logger.info(f"Installing requirements from: {task.requirements_path}")
+                    install_result = subprocess.run([
+                        python_executable, "-m", "pip", "install", "-r", task.requirements_path
+                    ], capture_output=True, text=True, timeout=300)
+                    
+                    if install_result.returncode != 0:
+                        task_logger.warning(f"Requirements installation had issues: {install_result.stderr}")
+                    else:
+                        task_logger.info("Requirements installed successfully")
             
-            task_logger.info(f"Task module loaded successfully: {task.module_name}")
-            
-            # Execute task
-            start_time = datetime.utcnow()
-            result = run_function(config or {})
-            end_time = datetime.utcnow()
+            # Execute task based on environment setup
+            if python_executable:
+                # Execute in isolated environment
+                result = self._execute_task_in_environment(task, python_executable, config, task_logger)
+            else:
+                # Execute in current environment (legacy mode)
+                run_function = self.load_task_module(task)
+                if not run_function:
+                    raise Exception(f"Could not load task module: {task.module_name}")
+                
+                task_logger.info(f"Task module loaded successfully: {task.module_name}")
+                result = run_function(config or {})
             
             # Calculate duration
-            duration = (end_time - start_time).total_seconds()
+            end_time = datetime.utcnow()
+            duration = (end_time - task_run.started_at).total_seconds()
             
             # Update task run record
             task_run.status = TaskStatus.SUCCESS.value
@@ -158,6 +191,116 @@ class TaskExecutor:
         
         return discovered_tasks
     
+    def _execute_task_in_environment(self, task: Task, python_executable: str, config: Optional[Dict[str, Any]], task_logger) -> Dict[str, Any]:
+        """Execute a task in an isolated environment"""
+        try:
+            # Create a temporary script to execute the task
+            import tempfile
+            import json
+            
+            # Prepare the execution script
+            script_content = f'''
+import sys
+import os
+import json
+import traceback
+from pathlib import Path
+
+# Add the task directory to Python path
+task_dir = Path("{os.path.dirname(task.file_path)}")
+sys.path.insert(0, str(task_dir))
+
+# Import and execute the task
+try:
+    import {task.module_name}
+    
+    # Prepare config
+    config = {json.dumps(config or {})}
+    
+    # Execute task
+    result = {task.module_name}.run_task(config)
+    
+    # Print result as JSON
+    print("TASK_RESULT_START")
+    print(json.dumps(result))
+    print("TASK_RESULT_END")
+    
+except Exception as e:
+    print("TASK_ERROR_START")
+    print(json.dumps({{
+        "status": "error",
+        "message": str(e),
+        "traceback": traceback.format_exc()
+    }}))
+    print("TASK_ERROR_END")
+'''
+            
+            # Create temporary script file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as script_file:
+                script_file.write(script_content)
+                script_path = script_file.name
+            
+            try:
+                # Execute the script in the isolated environment
+                task_logger.info(f"Executing task in isolated environment: {python_executable}")
+                
+                result = subprocess.run([
+                    python_executable, script_path
+                ], capture_output=True, text=True, timeout=3600)  # 1 hour timeout
+                
+                # Parse the output
+                output = result.stdout
+                error_output = result.stderr
+                
+                if error_output:
+                    task_logger.warning(f"Task stderr output: {error_output}")
+                
+                # Look for task result in output
+                if "TASK_RESULT_START" in output and "TASK_RESULT_END" in output:
+                    start_idx = output.find("TASK_RESULT_START") + len("TASK_RESULT_START")
+                    end_idx = output.find("TASK_RESULT_END")
+                    result_json = output[start_idx:end_idx].strip()
+                    
+                    try:
+                        return json.loads(result_json)
+                    except json.JSONDecodeError as e:
+                        task_logger.error(f"Failed to parse task result JSON: {e}")
+                        return {"status": "error", "message": f"Failed to parse result: {e}"}
+                
+                elif "TASK_ERROR_START" in output and "TASK_ERROR_END" in output:
+                    start_idx = output.find("TASK_ERROR_START") + len("TASK_ERROR_START")
+                    end_idx = output.find("TASK_ERROR_END")
+                    error_json = output[start_idx:end_idx].strip()
+                    
+                    try:
+                        error_result = json.loads(error_json)
+                        task_logger.error(f"Task execution error: {error_result}")
+                        return error_result
+                    except json.JSONDecodeError as e:
+                        task_logger.error(f"Failed to parse error JSON: {e}")
+                        return {"status": "error", "message": f"Failed to parse error: {e}"}
+                
+                else:
+                    # Fallback: return output as result
+                    task_logger.warning("Could not find task result markers, returning raw output")
+                    return {
+                        "status": "success",
+                        "message": "Task executed (raw output)",
+                        "output": output,
+                        "return_code": result.returncode
+                    }
+                
+            finally:
+                # Clean up temporary script
+                try:
+                    os.unlink(script_path)
+                except:
+                    pass
+                    
+        except Exception as e:
+            task_logger.error(f"Error executing task in environment: {e}")
+            return {"status": "error", "message": str(e)}
+
     def validate_task_file(self, file_path: str) -> Dict[str, Any]:
         """Validate if a file is a valid task file"""
         try:

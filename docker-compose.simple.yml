@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Main CronPilot application (simple setup)
+  cronpilot:
+    build: .
+    container_name: cronpilot-app
+    ports:
+      - "7000:7000"
+    environment:
+      - PYTHONPATH=/app
+      - TZ=UTC
+    volumes:
+      # Mount tasks directory for easy task management
+      - ./tasks:/app/tasks
+      # Mount logs directory for persistent logging
+      - ./logs:/app/logs
+      # Mount config for easy configuration changes
+      - ./config.yaml:/app/config.yaml:ro
+      # Mount database for persistence
+      - cronpilot_data:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  cronpilot_data:
+    driver: local

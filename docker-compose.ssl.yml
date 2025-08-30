@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Main CronPilot application
+  cronpilot:
+    build: .
+    container_name: cronpilot-app
+    expose:
+      - "7000"
+    environment:
+      - PYTHONPATH=/app
+      - TZ=UTC
+    volumes:
+      - ./tasks:/app/tasks
+      - ./logs:/app/logs
+      - ./config.yaml:/app/config.yaml:ro
+      - cronpilot_data:/app
+    restart: unless-stopped
+    networks:
+      - cronpilot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx with SSL (Let's Encrypt)
+  nginx:
+    image: nginx:alpine
+    container_name: cronpilot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-ssl.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - cronpilot
+    restart: unless-stopped
+    networks:
+      - cronpilot-network
+
+  # Certbot for Let's Encrypt SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: cronpilot-certbot
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./webroot:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email your-email@example.com --agree-tos --no-eff-email -d your-domain.com
+    depends_on:
+      - nginx
+    profiles:
+      - ssl-setup
+
+volumes:
+  cronpilot_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  cronpilot-network:
+    driver: bridge

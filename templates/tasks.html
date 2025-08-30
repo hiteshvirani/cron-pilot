@@ -13,6 +13,9 @@
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="discoverTasks()">
                 <i class="fas fa-search me-1"></i>Discover Tasks
             </button>
+            <button type="button" class="btn btn-sm btn-outline-info" onclick="showEnvironmentManager()">
+                <i class="fas fa-cogs me-1"></i>Environment Manager
+            </button>
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshTasks()">
                 <i class="fas fa-sync-alt me-1"></i>Refresh
             </button>
@@ -48,6 +51,12 @@
                             <strong>{{ task.name }}</strong>
                             <br>
                             <small class="text-muted">{{ task.description or 'No description' }}</small>
+                            {% if task.environment_path %}
+                            <br>
+                            <small class="text-info">
+                                <i class="fas fa-cog me-1"></i>Env: {{ task.environment_path.split('/')[-1] }}
+                            </small>
+                            {% endif %}
                         </td>
                         <td>
                             {% if task.schedule_type == 'manual' %}
@@ -145,73 +154,169 @@
     </div>
 </div>
 
-<!-- Schedule Edit Modal -->
-<div class="modal fade" id="scheduleModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Environment Manager Modal -->
+<div class="modal fade" id="environmentManagerModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Task Schedule</h5>
+                <h5 class="modal-title">Environment Manager</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="scheduleForm">
-                    <div class="mb-3">
-                        <label for="scheduleType" class="form-label">Schedule Type</label>
-                        <select class="form-select" id="scheduleType" name="schedule_type">
-                            <option value="manual">Manual</option>
-                            <option value="hourly">Hourly</option>
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="custom">Custom Cron</option>
-                        </select>
-                    </div>
-                    
-                    <div id="dailyConfig" class="mb-3" style="display: none;">
-                        <label for="dailyTime" class="form-label">Daily Time</label>
-                        <input type="time" class="form-control" id="dailyTime" name="daily_time" value="00:00">
-                    </div>
-                    
-                    <div id="weeklyConfig" class="mb-3" style="display: none;">
-                        <div class="row">
-                            <div class="col-6">
-                                <label for="weeklyDay" class="form-label">Day of Week</label>
-                                <select class="form-select" id="weeklyDay" name="weekly_day">
-                                    <option value="mon">Monday</option>
-                                    <option value="tue">Tuesday</option>
-                                    <option value="wed">Wednesday</option>
-                                    <option value="thu">Thursday</option>
-                                    <option value="fri">Friday</option>
-                                    <option value="sat">Saturday</option>
-                                    <option value="sun">Sunday</option>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label for="weeklyTime" class="form-label">Time</label>
-                                <input type="time" class="form-control" id="weeklyTime" name="weekly_time" value="00:00">
+                <ul class="nav nav-tabs" id="envTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="environments-tab" data-bs-toggle="tab" data-bs-target="#environments" type="button" role="tab">
+                            <i class="fas fa-cogs me-2"></i>Environments
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="requirements-tab" data-bs-toggle="tab" data-bs-target="#requirements" type="button" role="tab">
+                            <i class="fas fa-file-alt me-2"></i>Requirements Files
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="projects-tab" data-bs-toggle="tab" data-bs-target="#projects" type="button" role="tab">
+                            <i class="fas fa-folder me-2"></i>Task Projects
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="envTabContent">
+                    <div class="tab-pane fade show active" id="environments" role="tabpanel">
+                        <div id="environmentsList">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div id="customConfig" class="mb-3" style="display: none;">
-                        <label for="cronExpression" class="form-label">Cron Expression</label>
-                        <input type="text" class="form-control" id="cronExpression" name="cron_expression" 
-                               placeholder="0 0 * * * (minute hour day month day_of_week)">
-                        <div class="form-text">Format: minute hour day month day_of_week</div>
+                    <div class="tab-pane fade" id="requirements" role="tabpanel">
+                        <div id="requirementsList">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="isActive" name="is_active" checked>
-                            <label class="form-check-label" for="isActive">
-                                Active
-                            </label>
+                    <div class="tab-pane fade" id="projects" role="tabpanel">
+                        <div id="projectsList">
+                            <div class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Edit Modal -->
+<div class="modal fade" id="scheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Task Schedule & Environment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    <!-- Environment Configuration -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Environment Configuration</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="environmentPath" class="form-label">Environment Path</label>
+                                    <select class="form-select" id="environmentPath" name="environment_path">
+                                        <option value="">Use System Environment</option>
+                                    </select>
+                                    <div class="form-text">Select a virtual environment for this task</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="requirementsPath" class="form-label">Requirements File</label>
+                                    <select class="form-select" id="requirementsPath" name="requirements_path">
+                                        <option value="">No Requirements</option>
+                                    </select>
+                                    <div class="form-text">Select requirements.txt file to install</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Schedule Configuration -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Schedule Configuration</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="scheduleType" class="form-label">Schedule Type</label>
+                                <select class="form-select" id="scheduleType" name="schedule_type">
+                                    <option value="manual">Manual</option>
+                                    <option value="hourly">Hourly</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="custom">Custom Cron</option>
+                                </select>
+                            </div>
+                            
+                            <div id="dailyConfig" class="mb-3" style="display: none;">
+                                <label for="dailyTime" class="form-label">Daily Time</label>
+                                <input type="time" class="form-control" id="dailyTime" name="daily_time" value="00:00">
+                            </div>
+                            
+                            <div id="weeklyConfig" class="mb-3" style="display: none;">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label for="weeklyDay" class="form-label">Day of Week</label>
+                                        <select class="form-select" id="weeklyDay" name="weekly_day">
+                                            <option value="mon">Monday</option>
+                                            <option value="tue">Tuesday</option>
+                                            <option value="wed">Wednesday</option>
+                                            <option value="thu">Thursday</option>
+                                            <option value="fri">Friday</option>
+                                            <option value="sat">Saturday</option>
+                                            <option value="sun">Sunday</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="weeklyTime" class="form-label">Time</label>
+                                        <input type="time" class="form-control" id="weeklyTime" name="weekly_time" value="00:00">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="customConfig" class="mb-3" style="display: none;">
+                                <label for="cronExpression" class="form-label">Cron Expression</label>
+                                <input type="text" class="form-control" id="cronExpression" name="cron_expression" 
+                                       placeholder="0 0 * * * (minute hour day month day_of_week)">
+                                <div class="form-text">Format: minute hour day month day_of_week</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="isActive" name="is_active" checked>
+                                    <label class="form-check-label" for="isActive">
+                                        Active
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveSchedule()">Save Schedule</button>
+                <button type="button" class="btn btn-primary" onclick="saveSchedule()">Save Configuration</button>
             </div>
         </div>
     </div>
@@ -241,6 +346,126 @@ function discoverTasks() {
             console.error('Error discovering tasks:', error);
             alert('Error discovering tasks');
         });
+}
+
+function showEnvironmentManager() {
+    // Load environments
+    fetch('/api/tasks/environments')
+        .then(response => response.json())
+        .then(data => {
+            const envList = document.getElementById('environmentsList');
+            if (data.environments && data.environments.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-hover">';
+                html += '<thead><tr><th>Name</th><th>Path</th><th>Task Folder</th><th>Python Executable</th><th>Actions</th></tr></thead><tbody>';
+                
+                data.environments.forEach(env => {
+                    html += `<tr>
+                        <td><strong>${env.name}</strong></td>
+                        <td><code>${env.path}</code></td>
+                        <td>${env.task_folder}</td>
+                        <td><code>${env.python_executable}</code></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="validateEnvironment('${env.path}')">
+                                <i class="fas fa-check me-1"></i>Validate
+                            </button>
+                        </td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                envList.innerHTML = html;
+            } else {
+                envList.innerHTML = '<div class="text-center text-muted py-4"><p>No environments found</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading environments:', error);
+            document.getElementById('environmentsList').innerHTML = '<div class="alert alert-danger">Error loading environments</div>';
+        });
+    
+    // Load requirements files
+    fetch('/api/tasks/requirements')
+        .then(response => response.json())
+        .then(data => {
+            const reqList = document.getElementById('requirementsList');
+            if (data.requirements_files && data.requirements_files.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-hover">';
+                html += '<thead><tr><th>Name</th><th>Path</th><th>Task Folder</th><th>Size</th></tr></thead><tbody>';
+                
+                data.requirements_files.forEach(req => {
+                    html += `<tr>
+                        <td><strong>${req.name}</strong></td>
+                        <td><code>${req.path}</code></td>
+                        <td>${req.task_folder}</td>
+                        <td>${req.size} bytes</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                reqList.innerHTML = html;
+            } else {
+                reqList.innerHTML = '<div class="text-center text-muted py-4"><p>No requirements files found</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading requirements:', error);
+            document.getElementById('requirementsList').innerHTML = '<div class="alert alert-danger">Error loading requirements</div>';
+        });
+    
+    // Load task projects
+    fetch('/api/tasks/projects')
+        .then(response => response.json())
+        .then(data => {
+            const projList = document.getElementById('projectsList');
+            if (data.task_projects && data.task_projects.length > 0) {
+                let html = '<div class="table-responsive"><table class="table table-hover">';
+                html += '<thead><tr><th>Name</th><th>Main File</th><th>Files</th><th>Type</th></tr></thead><tbody>';
+                
+                data.task_projects.forEach(proj => {
+                    html += `<tr>
+                        <td><strong>${proj.name}</strong></td>
+                        <td><code>${proj.main_file}</code></td>
+                        <td>${proj.file_count} files</td>
+                        <td>${proj.is_package ? 'Package' : 'Project'}</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                projList.innerHTML = html;
+            } else {
+                projList.innerHTML = '<div class="text-center text-muted py-4"><p>No task projects found</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading projects:', error);
+            document.getElementById('projectsList').innerHTML = '<div class="alert alert-danger">Error loading projects</div>';
+        });
+    
+    new bootstrap.Modal(document.getElementById('environmentManagerModal')).show();
+}
+
+function validateEnvironment(envPath) {
+    fetch('/api/tasks/validate-environment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            environment_path: envPath
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.valid) {
+            alert('Environment is valid!');
+        } else {
+            alert('Environment validation failed: ' + data.errors.join(', '));
+        }
+    })
+    .catch(error => {
+        console.error('Error validating environment:', error);
+        alert('Error validating environment');
+    });
 }
 
 function runTask(taskId) {
@@ -312,7 +537,9 @@ function saveSchedule() {
     
     const scheduleData = {
         schedule_type: formData.get('schedule_type'),
-        is_active: formData.get('is_active') === 'on'
+        is_active: formData.get('is_active') === 'on',
+        environment_path: formData.get('environment_path') || null,
+        requirements_path: formData.get('requirements_path') || null
     };
     
     // Add schedule-specific config
@@ -342,13 +569,13 @@ function saveSchedule() {
     })
     .then(response => response.json())
     .then(data => {
-        alert('Schedule updated successfully!');
+        alert('Configuration updated successfully!');
         bootstrap.Modal.getInstance(document.getElementById('scheduleModal')).hide();
         refreshTasks();
     })
     .catch(error => {
-        console.error('Error updating schedule:', error);
-        alert('Error updating schedule');
+        console.error('Error updating configuration:', error);
+        alert('Error updating configuration');
     });
 }
 

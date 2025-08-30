@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  cronpilot:
+    # Development overrides
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      # Exclude build artifacts
+      - /app/__pycache__
+      - /app/.pytest_cache
+      - /app/.git
+    environment:
+      - PYTHONPATH=/app
+      - TZ=UTC
+      - DEBUG=1
+      - PYTHONDONTWRITEBYTECODE=1
+    # Use development command with auto-reload
+    command: ["python", "-m", "app.main"]
+    # Development ports
+    ports:
+      - "7000:7000"
+      - "7001:7001"  # Additional port for debugging
+    # Development settings
+    restart: "no"
+    # Remove healthcheck for development
+    healthcheck:
+      test: ["CMD", "echo", "development"]
+      interval: 1h
+      timeout: 10s
+      retries: 1
